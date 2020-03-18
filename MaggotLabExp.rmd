@@ -1,0 +1,278 @@
+---
+title: "MaggotLabExp4.19.18"
+author: "JReceveur"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: hide
+---
+  
+  ```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=14, fig.height=10)
+knitr::opts_chunk$set(fig.align="center")
+```
+
+``` {r import, message=FALSE, warning=FALSE,echo=TRUE}
+library(vegan)
+library(MASS)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(magrittr)
+library(scales)
+library(grid)
+library(reshape2)
+library(phyloseq)
+library(randomForest)
+library(knitr)
+library(ape)
+library(ggpubr)
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#000000","#CC79A7")
+theme_set(theme_bw(base_size = 18)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
+biom=import_biom("C:\\Users\\Joe Receveur\\Documents\\MSU data\\MaggotLabExpt\\MaggotExp4.19.18.biom",parseFunction= parse_taxonomy_greengenes)
+metadata=read.table("C:\\Users\\Joe Receveur\\Documents\\MSU data\\MaggotLabExpt\\MaggotExpMetadata.txt",header = TRUE)
+tree=read_tree("C:\\Users\\Joe Receveur\\Documents\\MSU data\\MaggotLabExpt\\MaggotExpTree4.19.18.nwk")
+sampdat=sample_data(metadata)
+sample_names(sampdat)=metadata$Sample_ID
+physeq=merge_phyloseq(biom,sampdat,tree)
+physeq=rarefy_even_depth(physeq, 2000, replace = TRUE, trimOTUs = TRUE, verbose = TRUE)
+physeq <- subset_taxa(physeq, Family != "mitochondria" & Class != "Chloroplast")
+
+
+physeq
+######Single rarefaction 3K
+
+```
+
+#Alpha Diversity
+###Observed Species
+
+```{r}
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Observed"))+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Observed Species")
+
+```
+
+##Simpson Diversity
+```{r}
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Shannon"),)+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Shannon Diversity")
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Shannon"),)+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Shannon Diversity")+facet_wrap(~Type)
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Simpson"),)+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Simpson Diversity")+facet_wrap(~SamplingTime~Treatment)
+
+```
+
+
+#Taxa Plots
+
+```{r filteringForFamily2}
+
+
+GPr  = transform_sample_counts(physeq, function(x) x / sum(x) ) #transform samples based on relative abundance
+GPrPhylum=tax_glom(GPr, "Phylum")
+PhylumLevel = filter_taxa(GPrPhylum, function(x) mean(x) > 1e-2, TRUE) #filter out any taxa lower tha 0.1%
+GPrFamily=tax_glom(GPr,"Family")
+FamilyLevel = filter_taxa(GPrFamily, function(x) mean(x) > 2e-2, TRUE) #filter out any taxa lower tha 1%
+GPrGenus=tax_glom(GPr,"Genus")
+GenusLevel = filter_taxa(GPrGenus, function(x) mean(x) > 2e-2, TRUE) #filter out any taxa lower tha 1%
+
+```
+
+##Phylum Level
+
+
+
+```{r PhylumRA, warning=FALSE}
+df <- psmelt(PhylumLevel)
+df$Abundance=df$Abundance*100
+Trtdata <- ddply(df, c("Phylum", "Treatment","Type"), summarise,
+                 N    = length(Abundance),
+                 mean = mean(Abundance),
+                 sd   = sd(Abundance),
+                 se   = sd / sqrt(N)
+)
+```
+
+```{r TreatmentPlot5}
+#labels <- c(Ceca = "Ceca", Cloacal_Swab = "Cloacal Swab",Large_Intestine_Tissue="Large Intestine Tissue", Small_Intestine_Contents="Small Intestine Contents",Headgut_Swab="Headgut Swab",Small_Intestine_Tissue="Small Intestine Tissue")
+cdataplot=ggplot(Trtdata, aes(x=Treatment,y=mean))+geom_bar(aes(fill = Phylum),colour="black", stat="identity")+xlab("Treatment")+ylab("Relative Abundance (> 1%)")+theme(axis.title.x=element_blank())+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+ scale_fill_manual(values=cbPalette)+facet_wrap(~Type)
+cdataplot#+  scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))
+#position = "fill"#+geom_errorbar(aes(ymin=mean-se,ymax=mean+se),color="black",width=1)+geom_line(size=1.5,linetype="dashed")+geom_point(size=6)+ylab(
+```
+
+```{r}
+df <- psmelt(PhylumLevel)
+df$Abundance=df$Abundance*100
+Trtdata <- ddply(df, c("Phylum", "Treatment"), summarise,
+                 N    = length(Abundance),
+                 mean = mean(Abundance),
+                 sd   = sd(Abundance),
+                 se   = sd / sqrt(N)
+)
+cdataplot=ggplot(Trtdata, aes(x=Treatment,y=mean))+geom_bar(aes(fill = Treatment),colour="black", stat="identity")+ facet_grid(~Phylum)+xlab("Decomp Stage")+ylab("Relative Abundance (> 2%)") + theme(axis.text.x = element_text(angle = 45, hjust = 1))+theme(axis.title.x=element_blank())+facet_wrap(~Phylum)+geom_errorbar(aes(ymin=mean-se,ymax=mean+se))+scale_colour_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
+#scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))+ theme(axis.text.x = element_text(angle = 45, hjust = 1))#+ scale_fill_manual(values=cbPalette)
+cdataplot
+Means=compare_means(Abundance ~ Treatment, data = df, 
+                    group.by = "Phylum", p.adjust.method = "fdr")
+#head(Means)
+keeps <- c("Phylum","group1","group2","p.adj","method","p.signif")
+keeps=Means[keeps]
+#keeps
+
+
+test3 <- list('Phylum'= keeps$Phylum,'group1'=keeps$group1,'group2'= keeps$group2,'p.adj'=keeps$p.adj,p.signif=keeps$p.signif,'Method'=keeps$method)
+test3= as.data.frame(test3)
+#test3
+FilteredResults<-test3[!(test3$p.adj>0.1),]            
+FilteredResults
+```
+
+
+##Family Level Relative Abundance
+
+
+```{r Summarizing2,warning=FALSE}
+df <- psmelt(FamilyLevel)
+df$Abundance=df$Abundance*100
+Trtdata <- ddply(df, c("Family", "Treatment","Type"), summarise,
+                 N    = length(Abundance),
+                 mean = mean(Abundance),
+                 sd   = sd(Abundance),
+                 se   = sd / sqrt(N)
+)
+```
+
+```{r TreatmentPlot}
+cdataplot=ggplot(Trtdata, aes(x=Treatment,y=mean))+geom_bar(aes(fill = Family),colour="black", stat="identity")+xlab("Treatment")+ylab("Relative Abundance (> 2%)")+theme(axis.title.x=element_blank())+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+facet_wrap(~Type)+ scale_fill_manual(values=cbPalette)
+cdataplot#+  scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))
+
+#position = "fill"#+geom_errorbar(aes(ymin=mean-se,ymax=mean+se),color="black",width=1)+geom_line(size=1.5,linetype="dashed")+geom_point(size=6)+ylab(
+
+#p <- ggbarplot(df, x = "Treatment", y = "Abundance",add = c("mean_se"),#"mean_se"
+#               color = "black", palette = "cbPalette", facet.by="Family",
+#               line.color = "gray", line.size = 0.4, short.panel.labs = TRUE, p.adjust.method = "fdr", fill= "Treatment") + stat_compare_means(aes(group = Treatment), label = "..p.signif..",label.y = 7) 
+
+#p+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+ylab("Relative abundance (> 1%)")+ theme(legend.position="none")
+```
+
+
+```{r}
+Trtdata <- ddply(df, c("Family", "Treatment"), summarise,
+                 N    = length(Abundance),
+                 mean = mean(Abundance),
+                 sd   = sd(Abundance),
+                 se   = sd / sqrt(N)
+)
+cdataplot=ggplot(Trtdata, aes(x=Treatment,y=mean))+geom_bar(aes(fill = Treatment),colour="black", stat="identity")+ facet_grid(~Sample_Type)+xlab("Decomp Stage")+ylab("Relative Abundance (> 2%)") + theme(axis.text.x = element_text(angle = 45, hjust = 1))+theme(axis.title.x=element_blank())+facet_wrap(~Family)+geom_errorbar(aes(ymin=mean-se,ymax=mean+se))+scale_colour_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
+#scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))+ theme(axis.text.x = element_text(angle = 45, hjust = 1))#+ scale_fill_manual(values=cbPalette)
+cdataplot # position = "fill"#+geom_errorbar(aes(ymin=mean-se,ymax=mean+se),color="black",width=1)+geom_line(size=1.5,linetype="dashed")+geom_point(size=6)
+theme_set(theme_bw(base_size = 18)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())) 
+```
+
+
+```{r}
+Means=compare_means(Abundance ~ Treatment, data = df, 
+                    group.by = "Family", p.adjust.method = "fdr")
+#head(Means)
+keeps <- c("Family","group1","group2","p.adj","method","p.signif")
+keeps=Means[keeps]
+#keeps
+
+
+test3 <- list('Family'= keeps$Family,'group1'=keeps$group1,'group2'= keeps$group2,'p.adj'=keeps$p.adj,p.signif=keeps$p.signif,'Method'=keeps$method)
+test3= as.data.frame(test3)
+#test3
+FilteredResults<-test3[!(test3$p.adj>0.1),]            
+FilteredResults
+```
+
+##Genus level
+
+```{r Summarizing3,warning=FALSE}
+df <- psmelt(GenusLevel)
+df$Abundance=df$Abundance*100
+Trtdata <- ddply(df, c("Genus", "Treatment","Type"), summarise,
+                 N    = length(Abundance),
+                 mean = mean(Abundance),
+                 sd   = sd(Abundance),
+                 se   = sd / sqrt(N)
+)
+```
+
+```{r TreatmentPlot4}
+cdataplot=ggplot(Trtdata, aes(x=Treatment,y=mean))+geom_bar(aes(fill = Genus),colour="black", stat="identity")+xlab("Treatment")+ylab("Relative Abundance (> 2%)") + theme(axis.text.x = element_text(angle = 0, hjust = 0.5))+theme(axis.title.x=element_blank())+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+facet_wrap(~Type)+ scale_fill_manual(values=cbPalette)
+cdataplot#+  scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))
+#position = "fill"#+geom_errorbar(aes(ymin=mean-se,ymax=mean+se),color="black",width=1)+geom_line(size=1.5,linetype="dashed")+geom_point(size=6)+ylab(
+
+#p <- ggbarplot(df, x = "Treatment", y = "Abundance",add = c("mean_se"),#"mean_se"
+#               color = "black", palette = "cbPalette", facet.by="Family",
+#               line.color = "gray", line.size = 0.4, short.panel.labs = TRUE, p.adjust.method = "fdr", fill= "Treatment") + stat_compare_means(aes(group = Treatment), label = "..p.signif..",label.y = 7) 
+
+#p+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+ylab("Relative abundance (> 1%)")+ theme(legend.position="none")
+Trtdata <- ddply(df, c("Genus", "Treatment"), summarise,
+                 N    = length(Abundance),
+                 mean = mean(Abundance),
+                 sd   = sd(Abundance),
+                 se   = sd / sqrt(N)
+)
+cdataplot=ggplot(Trtdata, aes(x=Treatment,y=mean))+geom_bar(aes(fill = Treatment),colour="black", stat="identity")+ facet_grid(~Genus)+xlab("Decomp Stage")+ylab("Relative Abundance (> 2%)") + theme(axis.text.x = element_text(angle = 45, hjust = 1))+theme(axis.title.x=element_blank())+facet_wrap(~Genus)+geom_errorbar(aes(ymin=mean-se,ymax=mean+se))+scale_colour_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
+#scale_x_discrete(labels=c("0 hrs", "24 hrs", "48 hrs","72 hrs"))+ theme(axis.text.x = element_text(angle = 45, hjust = 1))+ scale_fill_manual(values=cbPalette)
+cdataplot
+Means=compare_means(Abundance ~ Treatment, data = df, 
+                    group.by = "Genus", p.adjust.method = "fdr")
+#head(Means)
+keeps <- c("Genus","group1","group2","p.adj","method","p.signif")
+keeps=Means[keeps]
+#keeps
+
+
+test3 <- list('Genus'= keeps$Genus,'group1'=keeps$group1,'group2'= keeps$group2,'p.adj'=keeps$p.adj,p.signif=keeps$p.signif,'Method'=keeps$method)
+test3= as.data.frame(test3)
+#test3
+FilteredResults<-test3[!(test3$p.adj>0.1),]            
+FilteredResults
+```
+
+
+#Ordinations
+-All ordinations here were conducted using weighted unifrac (for other distince metrics see QIIME outputs)
+
+-Ellipses represent 95% CI for the mean of each group
+
+##PCoA 
+###By Treatment
+```{r PCoA, warning=FALSE}
+ord=ordinate(physeq,"PCoA", "wunifrac")
+ordplot=plot_ordination(physeq, ord,"samples", color="Treatment")+geom_point(size=4)+scale_colour_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
+ordplot+ stat_ellipse(type= "norm",geom = "polygon", alpha = 1/4, aes(fill = Treatment))+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())#+ theme(legend.justification=c(1,0), legend.position=c(1,0))
+
+```
+
+```{r PCoA2, warning=FALSE}
+ord=ordinate(physeq,"PCoA", "wunifrac")
+ordplot=plot_ordination(physeq, ord,"samples", color="Treatment")+geom_point(size=4)+scale_colour_manual(values=cbPalette)+scale_fill_manual(values=cbPalette)
+ordplot+ stat_ellipse(type= "norm",geom = "polygon", alpha = 1/4, aes(fill = Treatment))+ theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank())+facet_wrap(~Type)#+ theme(legend.justification=c(1,0), legend.position=c(1,0))
+
+```
+
+
+
+#PERMANOVAs
+
+##Homogenieity of Multivariate Dispersions
+```{r, warning=FALSE}
+GPdist=phyloseq::distance(physeq, "wunifrac")
+beta=betadisper(GPdist, sample_data(physeq)$Treatment)
+permutest(beta)
+boxplot(beta)
+```
+
+##Treatment x Location
+``` {r PERMANOVAs,warning=FALSE}
+GPdist=phyloseq::distance(physeq, "wunifrac")
+#MONMDS= ordinate(physeq, "NMDS",GPdist)
+```
+
+```{r}
+adonis(GPdist ~ Treatment*Type, as(sample_data(physeq), "data.frame"))
+```
