@@ -1,5 +1,5 @@
 ---
-title: "MaggotLabExp4.19.18"
+title: "MaggotLabExMar2020"
 author: "JReceveur"
 output: 
   html_document:
@@ -15,6 +15,51 @@ knitr::opts_chunk$set(fig.align="center")
 ```
 
 ``` {r import, message=FALSE, warning=FALSE,echo=TRUE}
+
+#Parse Silva function
+parse_taxonomy_silva_128 <- function(char.vec){
+  # Use default to assign names to elements in case problem with greengenes prefix
+  char.vec = parse_taxonomy_default(char.vec)
+  # Check for unassigned taxa
+  if (char.vec["Rank1"] == "Unassigned") {
+    char.vec <- c(Rank1="D_0__Unassigned", Rank2="D_1__Unassigned", Rank3="D_2__Unassigned", Rank4="D_3__Unassigned",
+                  Rank5="D_4__Unassigned", Rank6="D_5__Unassigned", Rank7="D_6__Unassigned")
+  }
+  # Define the meaning of each prefix according to SILVA taxonomy
+  Tranks = c(D_0="Kingdom", D_1="Phylum", D_2="Class", D_3="Order", D_4="Family", D_5="Genus", D_6="Species")
+  # Check for prefix using regexp, warn if there were none. trim indices, ti
+  ti = grep("[[:alpha:]]\\_[[:digit:]]{1}\\_\\_", char.vec)
+  if( length(ti) == 0L ){
+    warning(
+      "No silva prefixes were found. \n",
+      "Consider using parse_taxonomy_delfault() instead if true for all OTUs. \n",
+      "Dummy ranks may be included among taxonomic ranks now."
+    )
+    # Will want to return without further modifying char.vec
+    taxvec = char.vec
+    # Replace names of taxvec according to prefix, if any present...
+  } else {
+    # Format character vectors for Ambiguous taxa
+    if( length(ti) < 7 ){
+      for (key in names(char.vec)) {
+        if ( char.vec[key] == "Ambiguous_taxa" ) {
+          tax_no <- (as.numeric(substr(key, 5, 5)) - 1)
+          char.vec[key] = sprintf("D_%s__Ambiguous_taxa", tax_no)
+        }
+      }
+      # Reset the trimmed indicies if Ambiguous taxa
+      ti = grep("[[:alpha:]]\\_[[:digit:]]{1}\\_\\_", char.vec)
+    }
+    # Remove prefix using sub-"" regexp, call result taxvec
+    taxvec = gsub("[[:alpha:]]\\_[[:digit:]]{1}\\_\\_", "", char.vec)
+    # Define the ranks that will be replaced
+    repranks = Tranks[substr(char.vec[ti], 1, 3)]
+    # Replace, being sure to avoid prefixes notK present in Tranks
+    names(taxvec)[ti[!is.na(repranks)]] = repranks[!is.na(repranks)]
+  }
+  return(taxvec)
+}
+
 library(vegan)
 library(MASS)
 library(ggplot2)
@@ -31,18 +76,16 @@ library(ape)
 library(ggpubr)
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#000000","#CC79A7")
 theme_set(theme_bw(base_size = 18)+theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank()))
-biom=import_biom("C:\\Users\\Joe Receveur\\Documents\\MSU data\\MaggotLabExpt\\MaggotExp4.19.18.biom",parseFunction= parse_taxonomy_greengenes)
-metadata=read.table("C:\\Users\\Joe Receveur\\Documents\\MSU data\\MaggotLabExpt\\MaggotExpMetadata.txt",header = TRUE)
-tree=read_tree("C:\\Users\\Joe Receveur\\Documents\\MSU data\\MaggotLabExpt\\MaggotExpTree4.19.18.nwk")
+biom=import_biom("LabMaggotMar2020.biom",parseFunction= parse_taxonomy_silva_128)
+metadata=read.table("MaggotExpMetadata.txt",header = TRUE)
+tree=read_tree("MaggotTreeMar2020.nwk")
 sampdat=sample_data(metadata)
-sample_names(sampdat)=metadata$Sample_ID
+sample_names(sampdat)=metadata$SampleID
 physeq=merge_phyloseq(biom,sampdat,tree)
-physeq=rarefy_even_depth(physeq, 2000, replace = TRUE, trimOTUs = TRUE, verbose = TRUE)
-physeq <- subset_taxa(physeq, Family != "mitochondria" & Class != "Chloroplast")
 
 
 physeq
-######Single rarefaction 3K
+###### rarefaction 4K
 
 ```
 
