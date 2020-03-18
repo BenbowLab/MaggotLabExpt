@@ -99,9 +99,9 @@ plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Observed"))+g
 
 ##Simpson Diversity
 ```{r}
-plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Shannon"),)+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Shannon Diversity")
-plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Shannon"),)+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Shannon Diversity")+facet_wrap(~Type)
-plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Simpson"),)+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Simpson Diversity")+facet_wrap(~SamplingTime~Treatment)
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Shannon"))+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Shannon Diversity")
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Shannon"))+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Shannon Diversity")+facet_wrap(~Type)
+plot_richness(physeq, x="Treatment",color="Treatment", measures=c("Simpson"))+geom_boxplot(aes(x=Treatment, y=value, color=Treatment), alpha=0.05)+ylab("Simpson Diversity")+facet_wrap(~SamplingTime~Treatment)
 
 ```
 
